@@ -3,6 +3,7 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
+# Install Python dependencies (context is the model-server folder)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
@@ -31,7 +32,6 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
 
 EXPOSE 8080
 
-# Health check built into container
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
 
