@@ -1,0 +1,19 @@
+services:
+  # ── Backend: FastAPI Model Server (Docker) ────────────────────────────────
+  - type: web
+    name: ai-inference-api
+    runtime: docker
+    dockerfilePath: ./model-server/Dockerfile
+    plan: free                        # free tier: 512MB RAM, spins down when idle
+    healthCheckPath: /health
+    envVars:
+      - key: MODEL_NAME
+        value: iris-classifier
+
+  # ── Frontend: Static Dashboard ────────────────────────────────────────────
+  - type: web
+    name: ai-inference-dashboard
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    plan: free
