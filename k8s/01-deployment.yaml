@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-server
+  namespace: ai-inference
+  labels:
+    app: model-server
+    version: v1
+spec:
+  replicas: 2                         # initial replicas (HPA takes over)
+  selector:
+    matchLabels:
+      app: model-server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0               # zero-downtime deploys
+  template:
+    metadata:
+      labels:
+        app: model-server
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      # ── Security Context ──────────────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      # ── Init: wait for dependencies ───────────────────────────────────────
+      initContainers:
+      - name: check-config
+        image: busybox:1.36
+        command: ['sh', '-c', 'echo "Starting model server init"']
+
+      containers:
+      - name: model-server
+        image: ghcr.io/YOUR_GITHUB_USERNAME/ai-inference-pipeline:latest  # <-- update this
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+
+        # ── Resource Limits ─────────────────────────────────────────────────
+        resources:
+          requests:
+            cpu: "250m"              # 0.25 CPU cores guaranteed
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"             # burst to 1 full core
+            memory: "1Gi"
+            # nvidia.com/gpu: "1"    # uncomment for GPU
+
+        # ── Health Probes ────────────────────────────────────────────────────
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 3
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          failureThreshold: 30
+          periodSeconds: 2
+
+        # ── Environment ──────────────────────────────────────────────────────
+        env:
+        - name: MODEL_NAME
+          value: "iris-classifier"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+
+        # ── Volume Mounts ────────────────────────────────────────────────────
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/model
+          readOnly: true
+
+      volumes:
+      - name: model-storage
+        emptyDir: {}                 # replace with PVC or S3 in production

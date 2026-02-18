@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-server-svc
+  namespace: ai-inference
+  labels:
+    app: model-server
+spec:
+  selector:
+    app: model-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+# Expose externally via LoadBalancer (for cloud) or NodePort (for local)
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-server-external
+  namespace: ai-inference
+spec:
+  selector:
+    app: model-server
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: LoadBalancer   # change to NodePort for Minikube

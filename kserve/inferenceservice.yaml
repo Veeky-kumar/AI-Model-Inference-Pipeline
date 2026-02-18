@@ -1,0 +1,63 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: iris-classifier
+  namespace: ai-inference
+  annotations:
+    serving.kserve.io/enable-prometheus-scraping: "true"
+    serving.kserve.io/deploymentMode: Serverless   # or RawDeployment
+spec:
+  predictor:
+    # ── Autoscaling ──────────────────────────────────────────────────────────
+    minReplicas: 1
+    maxReplicas: 10
+    scaleTarget: 5              # target concurrent requests per pod
+    scaleMetric: concurrency    # options: concurrency | rps | cpu | memory
+
+    # ── Custom runtime (our FastAPI server) ──────────────────────────────────
+    containers:
+    - name: kserve-container
+      image: ghcr.io/YOUR_GITHUB_USERNAME/ai-inference-pipeline:latest
+      ports:
+      - containerPort: 8080
+        protocol: TCP
+      env:
+      - name: MODEL_NAME
+        value: iris-classifier
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+          # nvidia.com/gpu: "1"   # uncomment for GPU inference
+
+  # ── Canary Deployment (traffic splitting) ────────────────────────────────
+  # Uncomment to gradually roll out a new model version:
+  # transformer:                     # optional pre/post processing
+  #   containers:
+  #   - name: transformer
+  #     image: your-registry/transformer:v1
+---
+# ── KEDA ScaledObject (alternative to HPA for event-driven scaling) ──────────
+# Install KEDA first: helm install keda kedacore/keda
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: model-server-keda
+  namespace: ai-inference
+spec:
+  scaleTargetRef:
+    name: model-server
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  cooldownPeriod: 300
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: inference_requests_per_second
+      threshold: "100"
+      query: |
+        rate(inference_requests_total{status="success"}[1m])

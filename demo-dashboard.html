@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Inference Pipeline — Live Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050810;
+    --surface: #0b0f1a;
+    --surface2: #111827;
+    --border: #1e2d40;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --green: #00ff88;
+    --orange: #ff6b35;
+    --red: #ff4466;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* glow orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.15;
+  }
+  .orb1 { width: 600px; height: 600px; background: var(--accent2); top: -200px; right: -200px; animation: drift1 12s ease-in-out infinite alternate; }
+  .orb2 { width: 400px; height: 400px; background: var(--accent); bottom: -100px; left: -100px; animation: drift2 15s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform: translate(-80px, 80px); } }
+  @keyframes drift2 { to { transform: translate(80px, -80px); } }
+
+  .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* HEADER */
+  header {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: gap; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 24px rgba(0,229,255,0.3);
+  }
+  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 100px; padding: 8px 16px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .dot.dead { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* GRID */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+  @media(max-width:768px) { .grid-3,.grid-2 { grid-template-columns: 1fr; } }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: rgba(0,229,255,0.3); transform: translateY(-2px); }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .card:hover::before { opacity: 1; }
+
+  .metric-label { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .metric-value { font-size: 36px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+  .metric-unit { font-size: 14px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .metric-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  /* SECTION TITLES */
+  .section-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); font-family: var(--mono);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* INFERENCE PANEL */
+  .infer-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 24px; }
+  .infer-header { padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--surface2); display: flex; align-items: center; gap: 12px; }
+  .method-badge { background: var(--green); color: #000; font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
+  .endpoint-path { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+  .infer-body { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media(max-width:700px) { .infer-body { grid-template-columns:1fr; } }
+
+  label { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+  .input-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  input[type="number"] {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--mono); font-size: 14px;
+    padding: 10px 14px; width: 100%; outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,0.1); }
+
+  .iris-labels { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px; }
+  .iris-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: center; }
+
+  .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .preset-btn {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 6px 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn.setosa:hover { border-color: #00ff88; color: #00ff88; }
+  .preset-btn.versicolor:hover { border-color: #00e5ff; color: #00e5ff; }
+  .preset-btn.virginica:hover { border-color: #a855f7; color: #a855f7; }
+
+  .run-btn {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 10px;
+    color: #fff; font-family: var(--sans); font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .run-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,229,255,0.3); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .run-btn.loading::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+    animation: shimmer 1s infinite;
+  }
+  @keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+  /* RESULT */
+  .result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; min-height: 200px; display: flex; flex-direction: column; gap: 12px; }
+  .result-empty { color: var(--muted); font-family: var(--mono); font-size: 12px; display: flex; align-items: center; justify-content: center; height: 160px; }
+  .result-class { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  .result-class.setosa { color: #00ff88; }
+  .result-class.versicolor { color: #00e5ff; }
+  .result-class.virginica { color: #a855f7; }
+  .result-latency { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .prob-bars { display: flex; flex-direction: column; gap: 8px; }
+  .prob-row { display: flex; align-items: center; gap: 10px; }
+  .prob-name { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .prob-track { flex: 1; height: 8px; background: var(--surface2); border-radius: 100px; overflow: hidden; }
+  .prob-fill { height: 100%; border-radius: 100px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+  .prob-pct { font-family: var(--mono); font-size: 11px; width: 48px; text-align: right; }
+
+  /* API SECTION */
+  .api-list { display: flex; flex-direction: column; gap: 10px; }
+  .api-item {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px;
+    cursor: pointer; transition: all 0.2s; text-decoration: none;
+  }
+  .api-item:hover { border-color: rgba(0,229,255,0.3); }
+  .api-method { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; flex-shrink: 0; margin-top: 2px; }
+  .get { background: rgba(0,255,136,0.15); color: var(--green); }
+  .post { background: rgba(124,58,237,0.2); color: #a78bfa; }
+  .api-info { flex: 1; }
+  .api-path { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+  .api-desc { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .api-params { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .param-tag { font-family: var(--mono); font-size: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; color: var(--muted); }
+
+  /* ARCHITECTURE */
+  .arch-flow { display: flex; flex-direction: column; gap: 0; }
+  .arch-step {
+    display: flex; align-items: stretch; gap: 0;
+  }
+  .arch-left { display: flex; flex-direction: column; align-items: center; width: 40px; flex-shrink: 0; }
+  .arch-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); flex-shrink: 0; margin-top: 16px; box-shadow: 0 0 10px rgba(0,229,255,0.4); }
+  .arch-line { flex: 1; width: 2px; background: linear-gradient(to bottom, var(--accent), var(--accent2)); opacity: 0.3; }
+  .arch-content { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 6px 0 6px 12px; }
+  .arch-title { font-weight: 700; font-size: 13px; color: var(--text); }
+  .arch-detail { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .arch-step:last-child .arch-line { display: none; }
+
+  /* LOG */
+  .log-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; font-family: var(--mono); font-size: 11px; line-height: 1.8;
+    max-height: 180px; overflow-y: auto; color: var(--muted);
+  }
+  .log-box::-webkit-scrollbar { width: 4px; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-ok { color: var(--green); }
+  .log-info { color: var(--accent); }
+  .log-err { color: var(--red); }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .stat-item { background: var(--surface2); border-radius: 8px; padding: 12px; }
+  .stat-val { font-size: 22px; font-weight: 800; }
+  .stat-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* K8S EXPLAINER */
+  .k8s-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+  .k8s-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 16px; }
+  @media(max-width:600px) { .k8s-grid{grid-template-columns:1fr;} }
+  .k8s-item { background: var(--surface2); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
+  .k8s-icon { font-size: 24px; margin-bottom: 8px; }
+  .k8s-title { font-weight: 700; font-size: 13px; color: var(--accent); margin-bottom: 4px; }
+  .k8s-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* FOOTER */
+  footer { padding: 40px 0 24px; border-top: 1px solid var(--border); margin-top: 40px; }
+  .footer-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .footer-tag { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .tech-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-family: var(--mono); font-size: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 100px; padding: 4px 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <div class="logo-text">AI Inference Pipeline</div>
+          <div class="logo-sub">Docker · KServe · Kubernetes · HPA · Prometheus</div>
+        </div>
+      </div>
+      <div class="status-pill">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-text" style="font-family:var(--mono);font-size:12px;">Checking...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- LIVE METRICS -->
+  <div class="section-title">📊 Live Server Metrics</div>
+  <div class="grid-3" style="margin-bottom:32px;">
+    <div class="card">
+      <div class="metric-label">Total Requests</div>
+      <div class="metric-value" style="color:var(--accent)" id="total-req">0</div>
+      <div class="metric-sub">since page load</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Avg Latency</div>
+      <div class="metric-value" style="color:var(--green)" id="avg-lat">—<span class="metric-unit">ms</span></div>
+      <div class="metric-sub" id="lat-range">p50 / p95</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Success Rate</div>
+      <div class="metric-value" style="color:var(--green)" id="success-rate">—<span class="metric-unit">%</span></div>
+      <div class="metric-sub" id="err-count">0 errors</div>
+    </div>
+  </div>
+
+  <!-- INFERENCE DEMO -->
+  <div class="section-title">🤖 Live Inference Demo</div>
+  <div class="infer-card">
+    <div class="infer-header">
+      <span class="method-badge">POST</span>
+      <span class="endpoint-path">/v2/models/iris-classifier/infer</span>
+    </div>
+    <div class="infer-body">
+      <!-- INPUT SIDE -->
+      <div>
+        <label>Iris Flower Features</label>
+        <div class="iris-labels">
+          <div class="iris-label">🌿 Sepal Length (cm)</div>
+          <div class="iris-label">🌿 Sepal Width (cm)</div>
+          <div class="iris-label">🌸 Petal Length (cm)</div>
+          <div class="iris-label">🌸 Petal Width (cm)</div>
+        </div>
+        <div class="input-group">
+          <input type="number" id="f1" value="5.1" step="0.1" min="0" max="10">
+          <input type="number" id="f2" value="3.5" step="0.1" min="0" max="10">
+          <input type="number" id="f3" value="1.4" step="0.1" min="0" max="10">
+          <input type="number" id="f4" value="0.2" step="0.1" min="0" max="10">
+        </div>
+        <label style="margin-top:12px;">Quick Presets</label>
+        <div class="preset-row">
+          <button class="preset-btn setosa" onclick="setPreset(5.1,3.5,1.4,0.2)">🌿 Setosa</button>
+          <button class="preset-btn versicolor" onclick="setPreset(6.7,3.1,4.7,1.5)">🌀 Versicolor</button>
+          <button class="preset-btn virginica" onclick="setPreset(6.3,3.3,6.0,2.5)">🌺 Virginica</button>
+          <button class="preset-btn" onclick="setPreset(Math.random()*3+4.5,(Math.random()*2+2.5).toFixed(1),(Math.random()*5+1).toFixed(1),(Math.random()*1.8+0.1).toFixed(1))">🎲 Random</button>
+        </div>
+        <button class="run-btn" id="run-btn" onclick="runInference()">⚡ Run Inference</button>
+      </div>
+
+      <!-- OUTPUT SIDE -->
+      <div>
+        <label>Model Response</label>
+        <div class="result-box" id="result-box">
+          <div class="result-empty">Press "Run Inference" to get a prediction →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG + STATS -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px;">📋 Request Log</div>
+      <div class="log-box" id="log-box">
+        <span class="log-info">[ready]</span> Server connected. Run inference to see logs.<br>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px;">📈 Session Stats</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-val" style="color:var(--green)" id="s-setosa">0</div>
+          <div class="stat-lbl">🌿 Setosa</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val" style="color:var(--accent)" id="s-versicolor">0</div>
+          <div class="stat-lbl">🌀 Versicolor</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val" style="color:#a855f7" id="s-virginica">0</div>
+          <div class="stat-lbl">🌺 Virginica</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val" style="color:var(--orange)" id="s-fastest">—</div>
+          <div class="stat-lbl">⚡ Fastest (ms)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API REFERENCE -->
+  <div class="section-title">📡 All API Endpoints</div>
+  <div class="api-list" style="margin-bottom:32px;">
+    <a class="api-item" href="http://localhost:8080/health" target="_blank">
+      <span class="api-method get">GET</span>
+      <div class="api-info">
+        <div class="api-path">/health</div>
+        <div class="api-desc">Returns server health status and whether the model is loaded. Called by Kubernetes liveness probe every 10 seconds to check if the container is alive.</div>
+        <div class="api-params"><span class="param-tag">No params</span><span class="param-tag">Returns: {status, model_loaded, model}</span></div>
+      </div>
+    </a>
+    <a class="api-item" href="http://localhost:8080/ready" target="_blank">
+      <span class="api-method get">GET</span>
+      <div class="api-info">
+        <div class="api-path">/ready</div>
+        <div class="api-desc">Readiness check — returns 200 only when model is fully loaded. Kubernetes uses this to decide if the pod should receive traffic. If this fails, K8s removes the pod from the load balancer.</div>
+        <div class="api-params"><span class="param-tag">No params</span><span class="param-tag">Returns: {status}</span><span class="param-tag">503 if not ready</span></div>
+      </div>
+    </a>
+    <a class="api-item" href="http://localhost:8080/v2/models/iris-classifier" target="_blank">
+      <span class="api-method get">GET</span>
+      <div class="api-info">
+        <div class="api-path">/v2/models/{model_name}</div>
+        <div class="api-desc">Returns model metadata — name, version, input/output shapes and data types. This follows the KServe V2 inference protocol used in production ML systems. The {model_name} path param is the model identifier.</div>
+        <div class="api-params"><span class="param-tag">model_name: string (path)</span><span class="param-tag">Returns: {name, versions, inputs, outputs}</span></div>
+      </div>
+    </a>
+    <div class="api-item">
+      <span class="api-method post">POST</span>
+      <div class="api-info">
+        <div class="api-path">/v2/models/{model_name}/infer</div>
+        <div class="api-desc">The main inference endpoint. Send feature data, get predictions back. Follows KServe V2 protocol. Accepts batches (multiple samples at once). Tracks Prometheus metrics on every call.</div>
+        <div class="api-params">
+          <span class="param-tag">model_name: string (path)</span>
+          <span class="param-tag">id: string? (body) — request ID for tracing</span>
+          <span class="param-tag">inputs[].name: string — tensor name</span>
+          <span class="param-tag">inputs[].shape: int[] — e.g. [1,4]</span>
+          <span class="param-tag">inputs[].datatype: FP32|INT32</span>
+          <span class="param-tag">inputs[].data: number[][] — feature values</span>
+          <span class="param-tag">Returns: {id, model_name, outputs[]}</span>
+        </div>
+      </div>
+    </div>
+    <a class="api-item" href="http://localhost:8080/metrics" target="_blank">
+      <span class="api-method get">GET</span>
+      <div class="api-info">
+        <div class="api-path">/metrics</div>
+        <div class="api-desc">Prometheus metrics endpoint. Returns inference_requests_total (counter), inference_request_duration_seconds (histogram with p50/p95/p99), inference_active_requests (gauge), model_loaded (gauge). Prometheus server scrapes this every 15 seconds.</div>
+        <div class="api-params"><span class="param-tag">No params</span><span class="param-tag">Returns: Prometheus text format</span></div>
+      </div>
+    </a>
+    <a class="api-item" href="http://localhost:8080/docs" target="_blank">
+      <span class="api-method get">GET</span>
+      <div class="api-info">
+        <div class="api-path">/docs</div>
+        <div class="api-desc">Auto-generated Swagger UI — interactive API explorer. FastAPI generates this from your Python code automatically. You already saw this! Click to open in browser.</div>
+        <div class="api-params"><span class="param-tag">No params</span><span class="param-tag">Interactive Swagger UI</span></div>
+      </div>
+    </a>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div class="grid-2">
+    <div>
+      <div class="section-title">🏗️ What This Project Does</div>
+      <div class="arch-flow">
+        <div class="arch-step">
+          <div class="arch-left"><div class="arch-dot"></div><div class="arch-line"></div></div>
+          <div class="arch-content">
+            <div class="arch-title">🐍 Your AI Model (Python + FastAPI)</div>
+            <div class="arch-detail">server.py — takes flower measurements → returns species prediction with probability. This is what you just tested above.</div>
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-left"><div class="arch-dot"></div><div class="arch-line"></div></div>
+          <div class="arch-content">
+            <div class="arch-title">🐳 Docker Container</div>
+            <div class="arch-detail">Packages server.py + Python 3.11 + all libraries into one portable image. "Works on any machine" — your laptop, any server, any cloud.</div>
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-left"><div class="arch-dot"></div><div class="arch-line"></div></div>
+          <div class="arch-content">
+            <div class="arch-title">☸️ Kubernetes Deployment</div>
+            <div class="arch-detail">Runs 2+ copies (pods) of your container. If one crashes, K8s restarts it automatically. Spreads across machines for reliability.</div>
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-left"><div class="arch-dot"></div><div class="arch-line"></div></div>
+          <div class="arch-content">
+            <div class="arch-title">📈 HPA — Autoscaling</div>
+            <div class="arch-detail">When traffic spikes (lots of users), HPA adds more pods (1→10). When traffic drops, removes them. Fully automatic, zero human action.</div>
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-left"><div class="arch-dot"></div></div>
+          <div class="arch-content">
+            <div class="arch-title">📊 Prometheus + Grafana</div>
+            <div class="arch-detail">Prometheus scrapes /metrics every 15s. Grafana shows real-time graphs of latency, throughput, errors, pod count.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- K8S ROLE -->
+    <div>
+      <div class="section-title">☸️ What Kubernetes Does Here</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;">
+        Right now you're running 1 Docker container manually. In production with Kubernetes, the same image runs inside K8s which adds:
+      </div>
+      <div class="k8s-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="k8s-item">
+          <div class="k8s-icon">🔄</div>
+          <div class="k8s-title">Self-healing</div>
+          <div class="k8s-desc">Container crashes at 3am? K8s restarts it in seconds. No alerts, no manual fix.</div>
+        </div>
+        <div class="k8s-item">
+          <div class="k8s-icon">📈</div>
+          <div class="k8s-title">Auto-scaling</div>
+          <div class="k8s-desc">Traffic spike? HPA adds pods automatically. Quiet night? Scales back down to save cost.</div>
+        </div>
+        <div class="k8s-item">
+          <div class="k8s-icon">⚖️</div>
+          <div class="k8s-title">Load Balancing</div>
+          <div class="k8s-desc">10 pods running? K8s splits requests evenly across all of them via a Service.</div>
+        </div>
+        <div class="k8s-item">
+          <div class="k8s-icon">🚀</div>
+          <div class="k8s-title">Zero-downtime Deploy</div>
+          <div class="k8s-desc">New model version? Rolling update replaces pods one by one. Users never see downtime.</div>
+        </div>
+        <div class="k8s-item">
+          <div class="k8s-icon">🔐</div>
+          <div class="k8s-title">Resource Limits</div>
+          <div class="k8s-desc">Each pod gets guaranteed CPU/RAM. One bad model can't starve other services.</div>
+        </div>
+        <div class="k8s-item">
+          <div class="k8s-icon">🌐</div>
+          <div class="k8s-title">Multi-machine</div>
+          <div class="k8s-desc">Pods spread across multiple physical servers. One machine dies, others serve traffic.</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:6px;">ANALOGY</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6;">Docker is like baking one pizza in a box 🍕. Kubernetes is the restaurant chain that manages 100 kitchens, hires/fires chefs based on demand, and ensures food always reaches customers even if one kitchen catches fire. 🏭</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-tag">Built with Docker · FastAPI · Python 3.11 · Prometheus · KServe protocol</div>
+      <div class="tech-chips">
+        <span class="chip">localhost:8080</span>
+        <span class="chip">V2 Inference Protocol</span>
+        <span class="chip">Prometheus Metrics</span>
+        <span class="chip">Zero-downtime Ready</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const API = 'http://localhost:8080';
+  let stats = { total:0, success:0, errors:0, latencies:[], classes:{setosa:0,versicolor:0,virginica:0} };
+
+  // ── Health Check ──────────────────────────────────────────────────────────
+  async function checkHealth() {
+    try {
+      const r = await fetch(`${API}/health`);
+      const d = await r.json();
+      document.getElementById('status-dot').className = 'dot live';
+      document.getElementById('status-text').textContent = `${d.model} — Running`;
+    } catch(e) {
+      document.getElementById('status-dot').className = 'dot dead';
+      document.getElementById('status-text').textContent = 'Server offline — is Docker running?';
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 5000);
+
+  // ── Preset ────────────────────────────────────────────────────────────────
+  function setPreset(a,b,c,d) {
+    document.getElementById('f1').value = a;
+    document.getElementById('f2').value = b;
+    document.getElementById('f3').value = c;
+    document.getElementById('f4').value = d;
+  }
+
+  // ── Log ───────────────────────────────────────────────────────────────────
+  function addLog(msg, type='info') {
+    const box = document.getElementById('log-box');
+    const t = new Date().toLocaleTimeString();
+    box.innerHTML += `<span class="log-${type}">[${t}]</span> ${msg}<br>`;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ── Update Metrics ────────────────────────────────────────────────────────
+  function updateMetrics() {
+    document.getElementById('total-req').textContent = stats.total;
+    const rate = stats.total > 0 ? ((stats.success/stats.total)*100).toFixed(1) : '—';
+    document.getElementById('success-rate').innerHTML = rate + '<span class="metric-unit">%</span>';
+    document.getElementById('err-count').textContent = `${stats.errors} errors`;
+
+    if(stats.latencies.length > 0) {
+      const sorted = [...stats.latencies].sort((a,b)=>a-b);
+      const avg = (sorted.reduce((s,v)=>s+v,0)/sorted.length).toFixed(0);
+      const p95 = sorted[Math.floor(0.95*sorted.length)] || sorted[sorted.length-1];
+      document.getElementById('avg-lat').innerHTML = avg + '<span class="metric-unit">ms</span>';
+      document.getElementById('lat-range').textContent = `avg ${avg}ms / p95 ${p95.toFixed(0)}ms`;
+      document.getElementById('s-fastest').textContent = Math.min(...stats.latencies).toFixed(0);
+    }
+    document.getElementById('s-setosa').textContent = stats.classes.setosa;
+    document.getElementById('s-versicolor').textContent = stats.classes.versicolor;
+    document.getElementById('s-virginica').textContent = stats.classes.virginica;
+  }
+
+  // ── Main Inference Call ───────────────────────────────────────────────────
+  async function runInference() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true; btn.classList.add('loading'); btn.textContent = 'Running...';
+
+    const f1 = parseFloat(document.getElementById('f1').value);
+    const f2 = parseFloat(document.getElementById('f2').value);
+    const f3 = parseFloat(document.getElementById('f3').value);
+    const f4 = parseFloat(document.getElementById('f4').value);
+
+    const payload = {
+      id: `req-${Date.now()}`,
+      inputs: [{ name:"input", shape:[1,4], datatype:"FP32", data:[f1,f2,f3,f4] }]
+    };
+
+    const t0 = performance.now();
+    stats.total++;
+
+    try {
+      const res = await fetch(`${API}/v2/models/iris-classifier/infer`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const latency = performance.now() - t0;
+      const data = await res.json();
+
+      stats.success++;
+      stats.latencies.push(latency);
+      const cls = data.outputs[1].data[0];
+      if(stats.classes[cls] !== undefined) stats.classes[cls]++;
+
+      const probs = data.outputs[0].data[0];
+      const classes = ['setosa','versicolor','virginica'];
+      const colors = { setosa:'#00ff88', versicolor:'#00e5ff', virginica:'#a855f7' };
+
+      // render result
+      const box = document.getElementById('result-box');
+      box.innerHTML = `
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Predicted Species</div>
+          <div class="result-class ${cls}">${cls.charAt(0).toUpperCase()+cls.slice(1)}</div>
+          <div class="result-latency">⚡ ${latency.toFixed(1)}ms · confidence ${(Math.max(...probs)*100).toFixed(2)}%</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Class Probabilities</div>
+          <div class="prob-bars">
+            ${classes.map((c,i) => `
+              <div class="prob-row">
+                <div class="prob-name">${c}</div>
+                <div class="prob-track"><div class="prob-fill" style="width:${(probs[i]*100).toFixed(1)}%;background:${colors[c]}"></div></div>
+                <div class="prob-pct" style="color:${colors[c]}">${(probs[i]*100).toFixed(1)}%</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:8px 12px;line-height:1.8;">
+          input: [${[f1,f2,f3,f4].join(', ')}]<br>
+          model: ${data.model_name} ${data.model_version}
+        </div>`;
+
+      addLog(`✓ Predicted <strong>${cls}</strong> (${(Math.max(...probs)*100).toFixed(1)}%) in ${latency.toFixed(1)}ms`, 'ok');
+
+    } catch(err) {
+      stats.errors++;
+      document.getElementById('result-box').innerHTML = `<div style="color:var(--red);font-family:var(--mono);font-size:13px;padding:20px;">❌ Error: ${err.message}<br><br>Is the Docker container running?<br>Run: docker start model-server</div>`;
+      addLog(`✗ ${err.message}`, 'err');
+    }
+
+    updateMetrics();
+    btn.disabled = false; btn.classList.remove('loading'); btn.textContent = '⚡ Run Inference';
+  }
+</script>
+</body>
+</html>

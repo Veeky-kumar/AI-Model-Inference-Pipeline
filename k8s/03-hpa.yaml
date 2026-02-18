@@ -1,0 +1,58 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: model-server-hpa
+  namespace: ai-inference
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: model-server
+
+  minReplicas: 1          # never go below 1
+  maxReplicas: 10         # never exceed 10
+
+  metrics:
+  # ── Scale on CPU utilization ─────────────────────────────────────────────
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70     # target 70% CPU across all pods
+
+  # ── Scale on Memory utilization ──────────────────────────────────────────
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+  # ── Scale on custom metric: inference requests/sec ───────────────────────
+  # Requires prometheus-adapter installed (see monitoring/)
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"        # 100 req/sec per pod before scaling up
+
+  # ── Scaling Behavior ──────────────────────────────────────────────────────
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30   # wait 30s before scaling up again
+      policies:
+      - type: Pods
+        value: 2                        # add max 2 pods at a time
+        periodSeconds: 60
+      selectPolicy: Max
+
+    scaleDown:
+      stabilizationWindowSeconds: 300  # wait 5 min before scaling down
+      policies:
+      - type: Pods
+        value: 1                        # remove max 1 pod at a time
+        periodSeconds: 120
+      selectPolicy: Min                 # conservative scale-down

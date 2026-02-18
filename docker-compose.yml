@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  # ── Model Server ────────────────────────────────────────────────────────────
+  model-server:
+    build:
+      context: ./model-server
+      dockerfile: Dockerfile
+    container_name: ai-model-server
+    ports:
+      - "8080:8080"
+    environment:
+      - MODEL_NAME=iris-classifier
+      - LOG_LEVEL=info
+    volumes:
+      - ./model-server:/app  # hot-reload for dev
+    restart: unless-stopped
+    networks:
+      - ai-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - ai-net
+    depends_on:
+      - model-server
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana-dashboard.json:/etc/grafana/provisioning/dashboards/dashboard.json
+    networks:
+      - ai-net
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  ai-net:
+    driver: bridge
