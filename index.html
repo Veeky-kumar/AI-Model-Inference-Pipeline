@@ -358,7 +358,7 @@
     const btn=document.getElementById('rbtn');
     btn.disabled=true;btn.classList.add('loading');btn.textContent='Running...';
 
-    const vals=[f1,f2,f3,f4].map(id=>parseFloat(document.getElementById(id).value));
+    const vals=['f1','f2','f3','f4'].map(id=>parseFloat(document.getElementById(id).value));
     const payload={id:'req-'+Date.now(),inputs:[{name:'input',shape:[1,4],datatype:'FP32',data:vals}]};
 
     stats.total++;
