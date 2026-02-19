@@ -1,405 +1,1039 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Inference Pipeline — Live Demo</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #050810; --surface: #0b0f1a; --surface2: #111827;
-    --border: #1e2d40; --accent: #00e5ff; --accent2: #7c3aed;
-    --green: #00ff88; --orange: #ff6b35; --red: #ff4466;
-    --text: #e2e8f0; --muted: #64748b;
-    --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
-  body::before {
-    content:''; position:fixed; inset:0;
-    background-image: linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);
-    background-size:40px 40px; pointer-events:none; z-index:0;
-  }
-  .orb { position:fixed; border-radius:50%; filter:blur(120px); pointer-events:none; z-index:0; opacity:0.12; }
-  .orb1 { width:500px;height:500px;background:var(--accent2);top:-150px;right:-150px; animation:d1 12s ease-in-out infinite alternate; }
-  .orb2 { width:350px;height:350px;background:var(--accent);bottom:-100px;left:-100px; animation:d2 15s ease-in-out infinite alternate; }
-  @keyframes d1{to{transform:translate(-60px,60px)}} @keyframes d2{to{transform:translate(60px,-60px)}}
-  .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:0 24px; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Inference Pipeline — Live Demo</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050810;
+      --surface: #0b0f1a;
+      --surface2: #111827;
+      --border: #1e2d40;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --green: #00ff88;
+      --orange: #ff6b35;
+      --red: #ff4466;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
 
-  /* HEADER */
-  header { padding:28px 0 20px; border-bottom:1px solid var(--border); margin-bottom:32px; }
-  .hdr { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
-  .logo-row { display:flex; align-items:center; gap:12px; }
-  .logo-icon { width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 20px rgba(0,229,255,0.3); }
-  .logo-name { font-size:18px;font-weight:800;letter-spacing:-0.5px; }
-  .logo-sub { font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px; }
-  .pill { display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:7px 14px;font-family:var(--mono);font-size:11px; }
-  .dot { width:8px;height:8px;border-radius:50%;background:var(--muted); }
-  .dot.live { background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite; }
-  .dot.dead { background:var(--red); }
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  /* API CONFIG BAR */
-  .config-bar { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 20px;margin-bottom:24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
-  .config-label { font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap; }
-  .config-input { flex:1;min-width:280px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--accent);font-family:var(--mono);font-size:12px;padding:8px 14px;outline:none;transition:border-color 0.2s; }
-  .config-input:focus { border-color:var(--accent); }
-  .config-btn { background:var(--accent);color:#000;border:none;border-radius:8px;padding:8px 16px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.2s; }
-  .config-btn:hover { background:#00ccee; }
-  .local-btn { background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:all 0.2s; }
-  .local-btn:hover { color:var(--text);border-color:var(--accent); }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+    }
 
-  /* GRID */
-  .g3 { display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px; }
-  .g2 { display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px; }
-  @media(max-width:700px){.g3,.g2{grid-template-columns:1fr}}
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
 
-  /* CARDS */
-  .card { background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.2s; }
-  .card:hover { border-color:rgba(0,229,255,0.3);transform:translateY(-2px); }
-  .m-lbl { font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px; }
-  .m-val { font-size:32px;font-weight:800;letter-spacing:-1px;line-height:1; }
-  .m-unit { font-size:13px;color:var(--muted);font-weight:400;margin-left:3px; }
-  .m-sub { font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:6px; }
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.12;
+    }
 
-  /* SECTION */
-  .sec { font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-family:var(--mono);margin-bottom:14px;display:flex;align-items:center;gap:8px; }
-  .sec::after{content:'';flex:1;height:1px;background:var(--border);}
+    .orb1 {
+      width: 500px;
+      height: 500px;
+      background: var(--accent2);
+      top: -150px;
+      right: -150px;
+      animation: d1 12s ease-in-out infinite alternate;
+    }
 
-  /* INFERENCE */
-  .infer-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px; }
-  .infer-hdr { padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:10px; }
-  .mbadge { background:var(--green);color:#000;font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px; }
-  .ep { font-family:var(--mono);font-size:12px;color:var(--accent); }
-  .infer-body { padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px; }
-  @media(max-width:650px){.infer-body{grid-template-columns:1fr}}
+    .orb2 {
+      width: 350px;
+      height: 350px;
+      background: var(--accent);
+      bottom: -100px;
+      left: -100px;
+      animation: d2 15s ease-in-out infinite alternate;
+    }
 
-  label { display:block;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px; }
-  .ig { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px; }
-  input[type=number] { background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 12px;width:100%;outline:none;transition:border-color 0.2s; }
-  input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,255,0.1);}
-  .il { font-family:var(--mono);font-size:9px;color:var(--muted);text-align:center; }
-  .presets { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px; }
-  .pb { background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:var(--mono);font-size:10px;padding:5px 10px;cursor:pointer;transition:all 0.2s; }
-  .pb:hover{border-color:var(--accent);color:var(--accent);}
-  .run-btn { width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:9px;color:#fff;font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden; }
-  .run-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,229,255,0.25);}
-  .run-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
-  .run-btn.loading::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:shim 1s infinite;}
-  @keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+    @keyframes d1 {
+      to {
+        transform: translate(-60px, 60px)
+      }
+    }
 
-  /* RESULT */
-  .rbox { background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:14px;min-height:190px;display:flex;flex-direction:column;gap:10px; }
-  .rempty { color:var(--muted);font-family:var(--mono);font-size:11px;display:flex;align-items:center;justify-content:center;height:160px;text-align:center; }
-  .rcls { font-size:26px;font-weight:800;letter-spacing:-0.5px; }
-  .rcls.setosa{color:#00ff88} .rcls.versicolor{color:#00e5ff} .rcls.virginica{color:#a855f7}
-  .rlat { font-family:var(--mono);font-size:10px;color:var(--muted); }
-  .pbars { display:flex;flex-direction:column;gap:7px; }
-  .prow { display:flex;align-items:center;gap:8px; }
-  .pname { font-family:var(--mono);font-size:10px;color:var(--muted);width:72px;flex-shrink:0; }
-  .ptrack { flex:1;height:7px;background:var(--surface2);border-radius:100px;overflow:hidden; }
-  .pfill { height:100%;border-radius:100px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1); }
-  .ppct { font-family:var(--mono);font-size:10px;width:44px;text-align:right; }
+    @keyframes d2 {
+      to {
+        transform: translate(60px, -60px)
+      }
+    }
 
-  /* API */
-  .api-list { display:flex;flex-direction:column;gap:8px; }
-  .aitem { background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;text-decoration:none;transition:all 0.2s;cursor:pointer; }
-  .aitem:hover{border-color:rgba(0,229,255,0.3);}
-  .am{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:1px;}
-  .get{background:rgba(0,255,136,0.15);color:var(--green);}
-  .post{background:rgba(124,58,237,0.2);color:#a78bfa;}
-  .apath{font-family:var(--mono);font-size:12px;color:var(--accent);}
-  .adesc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;}
-  .atags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
-  .atag{font-family:var(--mono);font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--muted);}
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
 
-  /* LOG */
-  .logbox{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:14px;font-family:var(--mono);font-size:10px;line-height:1.8;max-height:160px;overflow-y:auto;color:var(--muted);}
-  .logbox::-webkit-scrollbar{width:3px;} .logbox::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-  .lok{color:var(--green);} .linf{color:var(--accent);} .lerr{color:var(--red);}
-  .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-  .sitem{background:var(--surface2);border-radius:7px;padding:10px;}
-  .sval{font-size:20px;font-weight:800;} .slbl{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;}
-</style>
+    /* HEADER */
+    header {
+      padding: 28px 0 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+
+    .hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+    }
+
+    .logo-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-sub {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-top: 2px;
+    }
+
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 7px 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .dot.live {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    .dot.dead {
+      background: var(--red);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.4
+      }
+    }
+
+    /* API CONFIG BAR */
+    .config-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .config-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .config-input {
+      flex: 1;
+      min-width: 280px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 8px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .config-input:focus {
+      border-color: var(--accent);
+    }
+
+    .config-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .config-btn:hover {
+      background: #00ccee;
+    }
+
+    .local-btn {
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .local-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* GRID */
+    .g3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .g2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    @media(max-width:700px) {
+
+      .g3,
+      .g2 {
+        grid-template-columns: 1fr
+      }
+    }
+
+    /* CARDS */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(0, 229, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .m-lbl {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .m-val {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .m-unit {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 400;
+      margin-left: 3px;
+    }
+
+    .m-sub {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* SECTION */
+    .sec {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-family: var(--mono);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sec::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* INFERENCE */
+    .infer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .infer-hdr {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mbadge {
+      background: var(--green);
+      color: #000;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 5px;
+    }
+
+    .ep {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    .infer-body {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media(max-width:650px) {
+      .infer-body {
+        grid-template-columns: 1fr
+      }
+    }
+
+    label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 7px;
+    }
+
+    .ig {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    input[type=number] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 9px 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type=number]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+    }
+
+    .il {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .presets {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .pb {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pb:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .run-btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 9px;
+      color: #fff;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .run-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 229, 255, 0.25);
+    }
+
+    .run-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .run-btn.loading::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+      animation: shim 1s infinite;
+    }
+
+    @keyframes shim {
+      from {
+        transform: translateX(-100%)
+      }
+
+      to {
+        transform: translateX(100%)
+      }
+    }
+
+    /* RESULT */
+    .rbox {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 14px;
+      min-height: 190px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rempty {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 160px;
+      text-align: center;
+    }
+
+    .rcls {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .rcls.setosa {
+      color: #00ff88
+    }
+
+    .rcls.versicolor {
+      color: #00e5ff
+    }
+
+    .rcls.virginica {
+      color: #a855f7
+    }
+
+    .rlat {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .pbars {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .prow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pname {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      width: 72px;
+      flex-shrink: 0;
+    }
+
+    .ptrack {
+      flex: 1;
+      height: 7px;
+      background: var(--surface2);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .pfill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .ppct {
+      font-family: var(--mono);
+      font-size: 10px;
+      width: 44px;
+      text-align: right;
+    }
+
+    /* API */
+    .api-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .aitem {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .aitem:hover {
+      border-color: rgba(0, 229, 255, 0.3);
+    }
+
+    .am {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .get {
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--green);
+    }
+
+    .post {
+      background: rgba(124, 58, 237, 0.2);
+      color: #a78bfa;
+    }
+
+    .apath {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    .adesc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.5;
+    }
+
+    .atags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 5px;
+    }
+
+    .atag {
+      font-family: var(--mono);
+      font-size: 9px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      color: var(--muted);
+    }
+
+    /* LOG */
+    .logbox {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.8;
+      max-height: 160px;
+      overflow-y: auto;
+      color: var(--muted);
+    }
+
+    .logbox::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .logbox::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .lok {
+      color: var(--green);
+    }
+
+    .linf {
+      color: var(--accent);
+    }
+
+    .lerr {
+      color: var(--red);
+    }
+
+    .sgrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .sitem {
+      background: var(--surface2);
+      border-radius: 7px;
+      padding: 10px;
+    }
+
+    .sval {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .slbl {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+  </style>
 </head>
+
 <body>
-<div class="orb orb1"></div><div class="orb orb2"></div>
-<div class="wrap">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="wrap">
 
-  <header>
-    <div class="hdr">
-      <div class="logo-row">
-        <div class="logo-icon">⚡</div>
+    <header>
+      <div class="hdr">
+        <div class="logo-row">
+          <div class="logo-icon">⚡</div>
+          <div>
+            <div class="logo-name">AI Inference Pipeline</div>
+            <div class="logo-sub">Docker · Kubernetes · KServe · FastAPI · Prometheus</div>
+          </div>
+        </div>
+        <div class="pill">
+          <div class="dot" id="sdot"></div>
+          <span id="stxt" style="font-family:var(--mono);font-size:11px;">Connecting...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- API URL CONFIG — works locally AND on deployed URL -->
+    <div class="config-bar">
+      <span class="config-label">🔗 API URL:</span>
+      <input class="config-input" id="api-url" type="text" value="https://ai-model-inference-pipeline.onrender.com"
+        placeholder="https://ai-model-inference-pipeline.onrender.com">
+      <button class="config-btn" onclick="setApi()">Connect</button>
+      <button class="local-btn" onclick="setLocal()">Use Localhost</button>
+    </div>
+
+    <!-- METRICS -->
+    <div class="sec">📊 Live Metrics</div>
+    <div class="g3" style="margin-bottom:28px;">
+      <div class="card">
+        <div class="m-lbl">Total Requests</div>
+        <div class="m-val" style="color:var(--accent)" id="mreq">0</div>
+        <div class="m-sub">since page load</div>
+      </div>
+      <div class="card">
+        <div class="m-lbl">Avg Latency</div>
+        <div class="m-val" style="color:var(--green)" id="mlat">—<span class="m-unit">ms</span></div>
+        <div class="m-sub" id="mlatr">p95 —</div>
+      </div>
+      <div class="card">
+        <div class="m-lbl">Success Rate</div>
+        <div class="m-val" style="color:var(--green)" id="mrate">—<span class="m-unit">%</span></div>
+        <div class="m-sub" id="merr">0 errors</div>
+      </div>
+    </div>
+
+    <!-- INFERENCE -->
+    <div class="sec">🤖 Live Inference Demo</div>
+    <div class="infer-card">
+      <div class="infer-hdr">
+        <span class="mbadge">POST</span>
+        <span class="ep">/v2/models/iris-classifier/infer</span>
+      </div>
+      <div class="infer-body">
         <div>
-          <div class="logo-name">AI Inference Pipeline</div>
-          <div class="logo-sub">Docker · Kubernetes · KServe · FastAPI · Prometheus</div>
+          <label>Iris Flower Features</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+            <div class="il">🌿 Sepal Length</div>
+            <div class="il">🌿 Sepal Width</div>
+            <div class="il">🌸 Petal Length</div>
+            <div class="il">🌸 Petal Width</div>
+          </div>
+          <div class="ig">
+            <input type="number" id="f1" value="5.1" step="0.1" min="0" max="10">
+            <input type="number" id="f2" value="3.5" step="0.1" min="0" max="10">
+            <input type="number" id="f3" value="1.4" step="0.1" min="0" max="10">
+            <input type="number" id="f4" value="0.2" step="0.1" min="0" max="10">
+          </div>
+          <label style="margin-top:10px;">Quick Presets</label>
+          <div class="presets">
+            <button class="pb" onclick="sp(5.1,3.5,1.4,0.2)">🌿 Setosa</button>
+            <button class="pb" onclick="sp(6.7,3.1,4.7,1.5)">🌀 Versicolor</button>
+            <button class="pb" onclick="sp(6.3,3.3,6.0,2.5)">🌺 Virginica</button>
+            <button class="pb"
+              onclick="sp((Math.random()*3+4.5).toFixed(1),(Math.random()*2+2.5).toFixed(1),(Math.random()*5+1).toFixed(1),(Math.random()*1.8+0.1).toFixed(1))">🎲
+              Random</button>
+          </div>
+          <button class="run-btn" id="rbtn" onclick="runInfer()">⚡ Run Inference</button>
         </div>
-      </div>
-      <div class="pill">
-        <div class="dot" id="sdot"></div>
-        <span id="stxt" style="font-family:var(--mono);font-size:11px;">Connecting...</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- API URL CONFIG — works locally AND on deployed URL -->
-  <div class="config-bar">
-    <span class="config-label">🔗 API URL:</span>
-    <input class="config-input" id="api-url" type="text" value="http://localhost:8080" placeholder="https://your-app.onrender.com">
-    <button class="config-btn" onclick="setApi()">Connect</button>
-    <button class="local-btn" onclick="setLocal()">Use Localhost</button>
-  </div>
-
-  <!-- METRICS -->
-  <div class="sec">📊 Live Metrics</div>
-  <div class="g3" style="margin-bottom:28px;">
-    <div class="card">
-      <div class="m-lbl">Total Requests</div>
-      <div class="m-val" style="color:var(--accent)" id="mreq">0</div>
-      <div class="m-sub">since page load</div>
-    </div>
-    <div class="card">
-      <div class="m-lbl">Avg Latency</div>
-      <div class="m-val" style="color:var(--green)" id="mlat">—<span class="m-unit">ms</span></div>
-      <div class="m-sub" id="mlatr">p95 —</div>
-    </div>
-    <div class="card">
-      <div class="m-lbl">Success Rate</div>
-      <div class="m-val" style="color:var(--green)" id="mrate">—<span class="m-unit">%</span></div>
-      <div class="m-sub" id="merr">0 errors</div>
-    </div>
-  </div>
-
-  <!-- INFERENCE -->
-  <div class="sec">🤖 Live Inference Demo</div>
-  <div class="infer-card">
-    <div class="infer-hdr">
-      <span class="mbadge">POST</span>
-      <span class="ep">/v2/models/iris-classifier/infer</span>
-    </div>
-    <div class="infer-body">
-      <div>
-        <label>Iris Flower Features</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
-          <div class="il">🌿 Sepal Length</div><div class="il">🌿 Sepal Width</div>
-          <div class="il">🌸 Petal Length</div><div class="il">🌸 Petal Width</div>
-        </div>
-        <div class="ig">
-          <input type="number" id="f1" value="5.1" step="0.1" min="0" max="10">
-          <input type="number" id="f2" value="3.5" step="0.1" min="0" max="10">
-          <input type="number" id="f3" value="1.4" step="0.1" min="0" max="10">
-          <input type="number" id="f4" value="0.2" step="0.1" min="0" max="10">
-        </div>
-        <label style="margin-top:10px;">Quick Presets</label>
-        <div class="presets">
-          <button class="pb" onclick="sp(5.1,3.5,1.4,0.2)">🌿 Setosa</button>
-          <button class="pb" onclick="sp(6.7,3.1,4.7,1.5)">🌀 Versicolor</button>
-          <button class="pb" onclick="sp(6.3,3.3,6.0,2.5)">🌺 Virginica</button>
-          <button class="pb" onclick="sp((Math.random()*3+4.5).toFixed(1),(Math.random()*2+2.5).toFixed(1),(Math.random()*5+1).toFixed(1),(Math.random()*1.8+0.1).toFixed(1))">🎲 Random</button>
-        </div>
-        <button class="run-btn" id="rbtn" onclick="runInfer()">⚡ Run Inference</button>
-      </div>
-      <div>
-        <label>Model Response</label>
-        <div class="rbox" id="rbox">
-          <div class="rempty">Set API URL above → press Run Inference<br><br>Local: http://localhost:8080<br>Deployed: your Render URL</div>
+        <div>
+          <label>Model Response</label>
+          <div class="rbox" id="rbox">
+            <div class="rempty">Set API URL above → press Run Inference<br><br>Local: http://localhost:8080<br>Deployed:
+              https://ai-model-inference-pipeline.onrender.com</div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- LOG + STATS -->
-  <div class="g2">
-    <div class="card">
-      <div class="sec" style="margin-bottom:10px;">📋 Request Log</div>
-      <div class="logbox" id="lbox"><span class="linf">[ready]</span> Waiting for requests...<br></div>
-    </div>
-    <div class="card">
-      <div class="sec" style="margin-bottom:10px;">📈 Session Stats</div>
-      <div class="sgrid">
-        <div class="sitem"><div class="sval" style="color:#00ff88" id="ss">0</div><div class="slbl">🌿 Setosa</div></div>
-        <div class="sitem"><div class="sval" style="color:#00e5ff" id="sv">0</div><div class="slbl">🌀 Versicolor</div></div>
-        <div class="sitem"><div class="sval" style="color:#a855f7" id="sg">0</div><div class="slbl">🌺 Virginica</div></div>
-        <div class="sitem"><div class="sval" style="color:var(--orange)" id="sf">—</div><div class="slbl">⚡ Fastest ms</div></div>
+    <!-- LOG + STATS -->
+    <div class="g2">
+      <div class="card">
+        <div class="sec" style="margin-bottom:10px;">📋 Request Log</div>
+        <div class="logbox" id="lbox"><span class="linf">[ready]</span> Waiting for requests...<br></div>
       </div>
-    </div>
-  </div>
-
-  <!-- API REFERENCE -->
-  <div class="sec">📡 API Endpoints</div>
-  <div class="api-list" style="margin-bottom:28px;">
-    <div class="aitem" onclick="openApi('/health')">
-      <span class="am get">GET</span>
-      <div>
-        <div class="apath">/health</div>
-        <div class="adesc">Kubernetes liveness probe — returns server status and model load state. Called every 10s by K8s. Fail = pod gets restarted automatically.</div>
-        <div class="atags"><span class="atag">No params</span><span class="atag">→ {status, model_loaded, model}</span></div>
-      </div>
-    </div>
-    <div class="aitem" onclick="openApi('/ready')">
-      <span class="am get">GET</span>
-      <div>
-        <div class="apath">/ready</div>
-        <div class="adesc">Kubernetes readiness probe — 200 only when model is fully loaded. Fail = pod removed from load balancer (not killed). Critical for ML: models take time to load.</div>
-        <div class="atags"><span class="atag">No params</span><span class="atag">503 if model not ready</span></div>
-      </div>
-    </div>
-    <div class="aitem" onclick="openApi('/v2/models/iris-classifier')">
-      <span class="am get">GET</span>
-      <div>
-        <div class="apath">/v2/models/{model_name}</div>
-        <div class="adesc">KServe V2 protocol — model metadata. Returns input/output shapes, supported versions. Same API standard used by Google, AWS SageMaker, Qualcomm AI Stack.</div>
-        <div class="atags"><span class="atag">model_name: string (path)</span><span class="atag">→ {name, versions, inputs, outputs}</span></div>
-      </div>
-    </div>
-    <div class="aitem">
-      <span class="am post">POST</span>
-      <div>
-        <div class="apath">/v2/models/{model_name}/infer</div>
-        <div class="adesc">Main inference endpoint. Accepts feature batches, returns predictions with probabilities. Records Prometheus metrics on every call: latency histogram + request counter.</div>
-        <div class="atags">
-          <span class="atag">id: string? — request trace ID</span>
-          <span class="atag">inputs[].name: string</span>
-          <span class="atag">inputs[].shape: [batch, features]</span>
-          <span class="atag">inputs[].datatype: FP32</span>
-          <span class="atag">inputs[].data: number[][]</span>
+      <div class="card">
+        <div class="sec" style="margin-bottom:10px;">📈 Session Stats</div>
+        <div class="sgrid">
+          <div class="sitem">
+            <div class="sval" style="color:#00ff88" id="ss">0</div>
+            <div class="slbl">🌿 Setosa</div>
+          </div>
+          <div class="sitem">
+            <div class="sval" style="color:#00e5ff" id="sv">0</div>
+            <div class="slbl">🌀 Versicolor</div>
+          </div>
+          <div class="sitem">
+            <div class="sval" style="color:#a855f7" id="sg">0</div>
+            <div class="slbl">🌺 Virginica</div>
+          </div>
+          <div class="sitem">
+            <div class="sval" style="color:var(--orange)" id="sf">—</div>
+            <div class="slbl">⚡ Fastest ms</div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="aitem" onclick="openApi('/metrics')">
-      <span class="am get">GET</span>
-      <div>
-        <div class="apath">/metrics</div>
-        <div class="adesc">Prometheus scrape endpoint. Exposes: inference_requests_total (counter), inference_request_duration_seconds (histogram → p50/p95/p99), inference_active_requests (gauge), model_loaded (gauge).</div>
-        <div class="atags"><span class="atag">Prometheus text format</span><span class="atag">Scraped every 15s</span></div>
+
+    <!-- API REFERENCE -->
+    <div class="sec">📡 API Endpoints</div>
+    <div class="api-list" style="margin-bottom:28px;">
+      <div class="aitem" onclick="openApi('/health')">
+        <span class="am get">GET</span>
+        <div>
+          <div class="apath">/health</div>
+          <div class="adesc">Kubernetes liveness probe — returns server status and model load state. Called every 10s by
+            K8s. Fail = pod gets restarted automatically.</div>
+          <div class="atags"><span class="atag">No params</span><span class="atag">→ {status, model_loaded,
+              model}</span></div>
+        </div>
+      </div>
+      <div class="aitem" onclick="openApi('/ready')">
+        <span class="am get">GET</span>
+        <div>
+          <div class="apath">/ready</div>
+          <div class="adesc">Kubernetes readiness probe — 200 only when model is fully loaded. Fail = pod removed from
+            load balancer (not killed). Critical for ML: models take time to load.</div>
+          <div class="atags"><span class="atag">No params</span><span class="atag">503 if model not ready</span></div>
+        </div>
+      </div>
+      <div class="aitem" onclick="openApi('/v2/models/iris-classifier')">
+        <span class="am get">GET</span>
+        <div>
+          <div class="apath">/v2/models/{model_name}</div>
+          <div class="adesc">KServe V2 protocol — model metadata. Returns input/output shapes, supported versions. Same
+            API standard used by Google, AWS SageMaker, Qualcomm AI Stack.</div>
+          <div class="atags"><span class="atag">model_name: string (path)</span><span class="atag">→ {name, versions,
+              inputs, outputs}</span></div>
+        </div>
+      </div>
+      <div class="aitem">
+        <span class="am post">POST</span>
+        <div>
+          <div class="apath">/v2/models/{model_name}/infer</div>
+          <div class="adesc">Main inference endpoint. Accepts feature batches, returns predictions with probabilities.
+            Records Prometheus metrics on every call: latency histogram + request counter.</div>
+          <div class="atags">
+            <span class="atag">id: string? — request trace ID</span>
+            <span class="atag">inputs[].name: string</span>
+            <span class="atag">inputs[].shape: [batch, features]</span>
+            <span class="atag">inputs[].datatype: FP32</span>
+            <span class="atag">inputs[].data: number[][]</span>
+          </div>
+        </div>
+      </div>
+      <div class="aitem" onclick="openApi('/metrics')">
+        <span class="am get">GET</span>
+        <div>
+          <div class="apath">/metrics</div>
+          <div class="adesc">Prometheus scrape endpoint. Exposes: inference_requests_total (counter),
+            inference_request_duration_seconds (histogram → p50/p95/p99), inference_active_requests (gauge),
+            model_loaded (gauge).</div>
+          <div class="atags"><span class="atag">Prometheus text format</span><span class="atag">Scraped every 15s</span>
+          </div>
+        </div>
+      </div>
+      <div class="aitem" onclick="openApi('/docs')">
+        <span class="am get">GET</span>
+        <div>
+          <div class="apath">/docs</div>
+          <div class="adesc">Auto-generated Swagger UI — FastAPI builds this from your Python code automatically.
+            Interactive API explorer. Click to open.</div>
+          <div class="atags"><span class="atag">Swagger / OpenAPI 3.1</span></div>
+        </div>
       </div>
     </div>
-    <div class="aitem" onclick="openApi('/docs')">
-      <span class="am get">GET</span>
-      <div>
-        <div class="apath">/docs</div>
-        <div class="adesc">Auto-generated Swagger UI — FastAPI builds this from your Python code automatically. Interactive API explorer. Click to open.</div>
-        <div class="atags"><span class="atag">Swagger / OpenAPI 3.1</span></div>
-      </div>
-    </div>
-  </div>
 
-</div><!-- end wrap -->
+  </div><!-- end wrap -->
 
-<script>
-  let API = localStorage.getItem('api_url') || 'http://localhost:8080';
-  let stats = {total:0,ok:0,err:0,lats:[],cls:{setosa:0,versicolor:0,virginica:0}};
+  <script>
+    let API = localStorage.getItem('api_url') || 'https://ai-model-inference-pipeline.onrender.com';
+    let stats = { total: 0, ok: 0, err: 0, lats: [], cls: { setosa: 0, versicolor: 0, virginica: 0 } };
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-  window.onload = () => {
-    document.getElementById('api-url').value = API;
-    checkHealth();
-    setInterval(checkHealth, 6000);
-  };
+    // ── Init ──────────────────────────────────────────────────────────────────
+    window.onload = () => {
+      document.getElementById('api-url').value = API;
+      checkHealth();
+      setInterval(checkHealth, 6000);
+    };
 
-  function setApi() {
-    API = document.getElementById('api-url').value.replace(/\/$/, '');
-    localStorage.setItem('api_url', API);
-    checkHealth();
-    log('Connected to '+API,'inf');
-  }
-  function setLocal() {
-    API = 'http://localhost:8080';
-    document.getElementById('api-url').value = API;
-    localStorage.setItem('api_url', API);
-    checkHealth();
-  }
-  function openApi(path) { window.open(API+path,'_blank'); }
-
-  // ── Health ────────────────────────────────────────────────────────────────
-  async function checkHealth() {
-    try {
-      const r = await fetch(API+'/health',{signal:AbortSignal.timeout(4000)});
-      const d = await r.json();
-      document.getElementById('sdot').className='dot live';
-      document.getElementById('stxt').textContent=d.model+' · Running';
-    } catch {
-      document.getElementById('sdot').className='dot dead';
-      document.getElementById('stxt').textContent='Offline — check API URL above';
+    function setApi() {
+      API = document.getElementById('api-url').value.replace(/\/$/, '');
+      localStorage.setItem('api_url', API);
+      checkHealth();
+      log('Connected to ' + API, 'inf');
     }
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function sp(a,b,c,d){
-    document.getElementById('f1').value=a;document.getElementById('f2').value=b;
-    document.getElementById('f3').value=c;document.getElementById('f4').value=d;
-  }
-  function log(msg,type='inf'){
-    const b=document.getElementById('lbox');
-    const t=new Date().toLocaleTimeString();
-    b.innerHTML+=`<span class="l${type}">[${t}]</span> ${msg}<br>`;
-    b.scrollTop=b.scrollHeight;
-  }
-  function updateMetrics(){
-    document.getElementById('mreq').textContent=stats.total;
-    const rate=stats.total>0?((stats.ok/stats.total)*100).toFixed(1):'—';
-    document.getElementById('mrate').innerHTML=rate+'<span class="m-unit">%</span>';
-    document.getElementById('merr').textContent=stats.err+' errors';
-    if(stats.lats.length){
-      const s=[...stats.lats].sort((a,b)=>a-b);
-      const avg=(s.reduce((a,v)=>a+v,0)/s.length).toFixed(0);
-      const p95=s[Math.floor(0.95*s.length)]||s[s.length-1];
-      document.getElementById('mlat').innerHTML=avg+'<span class="m-unit">ms</span>';
-      document.getElementById('mlatr').textContent=`avg ${avg}ms / p95 ${p95.toFixed(0)}ms`;
-      document.getElementById('sf').textContent=Math.min(...stats.lats).toFixed(0);
+    function setLocal() {
+      API = 'http://localhost:8080';
+      document.getElementById('api-url').value = API;
+      localStorage.setItem('api_url', API);
+      checkHealth();
     }
-    document.getElementById('ss').textContent=stats.cls.setosa;
-    document.getElementById('sv').textContent=stats.cls.versicolor;
-    document.getElementById('sg').textContent=stats.cls.virginica;
-  }
+    function openApi(path) { window.open(API + path, '_blank'); }
 
-  // ── Inference ─────────────────────────────────────────────────────────────
-  async function runInfer(){
-    const btn=document.getElementById('rbtn');
-    btn.disabled=true;btn.classList.add('loading');btn.textContent='Running...';
+    // ── Health ────────────────────────────────────────────────────────────────
+    async function checkHealth() {
+      try {
+        const r = await fetch(API + '/health', { signal: AbortSignal.timeout(4000) });
+        const d = await r.json();
+        document.getElementById('sdot').className = 'dot live';
+        document.getElementById('stxt').textContent = d.model + ' · Running';
+      } catch {
+        document.getElementById('sdot').className = 'dot dead';
+        document.getElementById('stxt').textContent = 'Offline — check API URL above';
+      }
+    }
 
-    const vals=['f1','f2','f3','f4'].map(id=>parseFloat(document.getElementById(id).value));
-    const payload={id:'req-'+Date.now(),inputs:[{name:'input',shape:[1,4],datatype:'FP32',data:vals}]};
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function sp(a, b, c, d) {
+      document.getElementById('f1').value = a; document.getElementById('f2').value = b;
+      document.getElementById('f3').value = c; document.getElementById('f4').value = d;
+    }
+    function log(msg, type = 'inf') {
+      const b = document.getElementById('lbox');
+      const t = new Date().toLocaleTimeString();
+      b.innerHTML += `<span class="l${type}">[${t}]</span> ${msg}<br>`;
+      b.scrollTop = b.scrollHeight;
+    }
+    function updateMetrics() {
+      document.getElementById('mreq').textContent = stats.total;
+      const rate = stats.total > 0 ? ((stats.ok / stats.total) * 100).toFixed(1) : '—';
+      document.getElementById('mrate').innerHTML = rate + '<span class="m-unit">%</span>';
+      document.getElementById('merr').textContent = stats.err + ' errors';
+      if (stats.lats.length) {
+        const s = [...stats.lats].sort((a, b) => a - b);
+        const avg = (s.reduce((a, v) => a + v, 0) / s.length).toFixed(0);
+        const p95 = s[Math.floor(0.95 * s.length)] || s[s.length - 1];
+        document.getElementById('mlat').innerHTML = avg + '<span class="m-unit">ms</span>';
+        document.getElementById('mlatr').textContent = `avg ${avg}ms / p95 ${p95.toFixed(0)}ms`;
+        document.getElementById('sf').textContent = Math.min(...stats.lats).toFixed(0);
+      }
+      document.getElementById('ss').textContent = stats.cls.setosa;
+      document.getElementById('sv').textContent = stats.cls.versicolor;
+      document.getElementById('sg').textContent = stats.cls.virginica;
+    }
 
-    stats.total++;
-    const t0=performance.now();
-    try {
-      const res=await fetch(API+'/v2/models/iris-classifier/infer',{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
-      });
-      const lat=performance.now()-t0;
-      const data=await res.json();
-      stats.ok++;stats.lats.push(lat);
-      const cls=data.outputs[1].data[0];
-      if(stats.cls[cls]!==undefined)stats.cls[cls]++;
-      const probs=data.outputs[0].data[0];
-      const clrs={setosa:'#00ff88',versicolor:'#00e5ff',virginica:'#a855f7'};
-      const names=['setosa','versicolor','virginica'];
-      document.getElementById('rbox').innerHTML=`
+    // ── Inference ─────────────────────────────────────────────────────────────
+    async function runInfer() {
+      const btn = document.getElementById('rbtn');
+      btn.disabled = true; btn.classList.add('loading'); btn.textContent = 'Running...';
+
+      const vals = ['f1', 'f2', 'f3', 'f4'].map(id => parseFloat(document.getElementById(id).value));
+      const payload = { id: 'req-' + Date.now(), inputs: [{ name: 'input', shape: [1, 4], datatype: 'FP32', data: vals }] };
+
+      stats.total++;
+      const t0 = performance.now();
+      try {
+        const res = await fetch(API + '/v2/models/iris-classifier/infer', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const lat = performance.now() - t0;
+        const data = await res.json();
+        stats.ok++; stats.lats.push(lat);
+        const cls = data.outputs[1].data[0];
+        if (stats.cls[cls] !== undefined) stats.cls[cls]++;
+        const probs = data.outputs[0].data[0];
+        const clrs = { setosa: '#00ff88', versicolor: '#00e5ff', virginica: '#a855f7' };
+        const names = ['setosa', 'versicolor', 'virginica'];
+        document.getElementById('rbox').innerHTML = `
         <div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Predicted</div>
-          <div class="rcls ${cls}">${cls.charAt(0).toUpperCase()+cls.slice(1)}</div>
-          <div class="rlat">⚡ ${lat.toFixed(1)}ms · ${(Math.max(...probs)*100).toFixed(2)}% confidence</div>
+          <div class="rcls ${cls}">${cls.charAt(0).toUpperCase() + cls.slice(1)}</div>
+          <div class="rlat">⚡ ${lat.toFixed(1)}ms · ${(Math.max(...probs) * 100).toFixed(2)}% confidence</div>
         </div>
-        <div class="pbars">${names.map((n,i)=>`
+        <div class="pbars">${names.map((n, i) => `
           <div class="prow">
             <div class="pname">${n}</div>
-            <div class="ptrack"><div class="pfill" style="width:${(probs[i]*100).toFixed(1)}%;background:${clrs[n]}"></div></div>
-            <div class="ppct" style="color:${clrs[n]}">${(probs[i]*100).toFixed(1)}%</div>
+            <div class="ptrack"><div class="pfill" style="width:${(probs[i] * 100).toFixed(1)}%;background:${clrs[n]}"></div></div>
+            <div class="ppct" style="color:${clrs[n]}">${(probs[i] * 100).toFixed(1)}%</div>
           </div>`).join('')}
         </div>
         <div style="font-family:var(--mono);font-size:9px;color:var(--muted);background:var(--surface2);border-radius:5px;padding:7px 10px;">
           input: [${vals.join(', ')}] · model: ${data.model_name} ${data.model_version}
         </div>`;
-      log(`✓ <strong>${cls}</strong> (${(Math.max(...probs)*100).toFixed(1)}%) in ${lat.toFixed(1)}ms`,'ok');
-    } catch(e) {
-      stats.err++;
-      document.getElementById('rbox').innerHTML=`<div style="color:var(--red);font-family:var(--mono);font-size:12px;padding:16px;">❌ ${e.message}<br><br>Check the API URL above.<br>Is the server running?</div>`;
-      log('✗ '+e.message,'err');
+        log(`✓ <strong>${cls}</strong> (${(Math.max(...probs) * 100).toFixed(1)}%) in ${lat.toFixed(1)}ms`, 'ok');
+      } catch (e) {
+        stats.err++;
+        document.getElementById('rbox').innerHTML = `<div style="color:var(--red);font-family:var(--mono);font-size:12px;padding:16px;">❌ ${e.message}<br><br>Check the API URL above.<br>Is the server running?</div>`;
+        log('✗ ' + e.message, 'err');
+      }
+      updateMetrics();
+      btn.disabled = false; btn.classList.remove('loading'); btn.textContent = '⚡ Run Inference';
     }
-    updateMetrics();
-    btn.disabled=false;btn.classList.remove('loading');btn.textContent='⚡ Run Inference';
-  }
-</script>
+  </script>
 </body>
+
 </html>
